@@ -62,6 +62,11 @@ clean_data <- read_csv(here("data", "stokes15_ivdata.csv")) %>%
 
 clean_data %>%
     select(proposed_turbine_3km, log_home_val_07, p_uni_degree, log_median_inc, log_pop_denc) %>%
+    tbl_summary(
+        by = proposed_turbine_3km,
+        statistic = list(all_continuous() ~ "{mean} ({sd})")) %>% 
+     modify_header(label ~ "**Variable**") %>% 
+            modify_spanning_header(c("stat_1", "stat_2") ~ "**Treatment**")
 
 
 ```
@@ -103,7 +108,15 @@ Mahalanobis distance matching was first used to pair each treated unit with a co
 ```{r}
 set.seed(02252025)
 
-match_model <- 
+match_model <- matchit(
+    proposed_turbine_3km ~ #treatment
+        log_home_val_07 + p_uni_degree + log_median_inc + log_pop_denc, # covariates
+    data = clean_data, 
+    method = "nearest",
+    distance = "mahalonobis",
+    ratio = 1,
+    replace = FALSE
+)
 
 # Extract matched data
 matched_data <- match.data(match_model)
@@ -133,7 +146,11 @@ new_names <- data.frame(
     new = c("Home Value (log)", "Percent University Degree", "Median Income (log)", "Population Density (log)"))
 
 # Love plot
-
+love.plot(
+    match_model, stats = "mean.diffs",
+    thresholds = c(m=.1),
+    var.names = new_names
+)
 
 ```
 
@@ -144,7 +161,8 @@ new_names <- data.frame(
 ------------------------------------------------------------------------
 
 ```{r}
-propensity_scores <- 
+propensity_scores <- bal.tab(propensity_scores, 
+                             var.names= new_names)
     
 ```
 
@@ -155,7 +173,8 @@ propensity_scores <-
 ------------------------------------------------------------------------
 
 ```{r}
-
+bal.tab(propensity_scores,
+        var.names = new_names)
 
 ```
 
@@ -215,6 +234,13 @@ $$ProposedTurbine_i = \beta_0 + \beta_1 WindPower_i + ControlVariables... + \eps
 # mindistlake + mindistlake_sq + longitude + long_sq + latitude + lat_sq + long_lat + district_id 
 
 first_stage <-
+    lm(
+        proposed_turbine_3km ~
+            log_wind_power +
+            mindistlake + mindistlake_sq +
+            longitude + long_sq + latitude + lat_sq + long_lat +formula +
+            district_id, 
+        data = matched_data)
     
     
 ```
